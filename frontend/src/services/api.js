@@ -93,6 +93,11 @@ export const getManagerLeaveRequests = async () => {
   return response.data;
 };
 
+export const getAllLeaveRequests = async () => {
+  const response = await api.get("/admin-manager/leave-requests");
+
+  return response.data;
+};
 
 export const approveLeaveRequest = async (requestId) => {
   const response = await api.put(
@@ -132,6 +137,13 @@ export const createUser = async (data) => {
   return response.data;
 };
 
+export const deleteUser = async (userId) => {
+  const response = await api.delete(`/users/${userId}`);
+
+  return response.data;
+};
+
+
 export const updateLeaveType = async (leaveTypeId, data) => {
   const response = await api.put(
     `/leave-types/${leaveTypeId}`,
@@ -148,5 +160,36 @@ export const deleteLeaveType = async (leaveTypeId) => {
 
   return response.data;
 };
+
+
+export const createHoliday = async (data) => {
+  const response = await api.post("/holidays", data);
+
+  return response.data;
+};
+
+export const getHolidays = async () => {
+  const response = await api.get("/holidays");
+
+  return response.data;
+};
+
+export const updateHoliday = async (holidayId, data) => {
+  const response = await api.put(
+    `/holidays/${holidayId}`,
+    data
+  );
+
+  return response.data;
+};
+
+export const deleteHoliday = async (holidayId) => {
+  const response = await api.delete(
+    `/holidays/${holidayId}`
+  );
+
+  return response.data;
+};
+
 
 export default api;

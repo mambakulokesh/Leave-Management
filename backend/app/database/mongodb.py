@@ -14,3 +14,5 @@ leave_types_collection = database["leave_types"]
 leave_balances_collection = database["leave_balances"]
 
 leave_requests_collection = database["leave_requests"]
+
+holidays_collection = database["holidays"]

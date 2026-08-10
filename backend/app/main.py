@@ -3,9 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from app.database.mongodb import client
+
 from app.routers.authRoutes import router as auth_router
 from app.routers.userRoutes import router as users_router
 from app.routers.leaveRoutes import router as leave_router
+from app.routers.holidaysRoutes import router as holidays_router
 
 
 app = FastAPI()
@@ -21,6 +23,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(leave_router)
+app.include_router(holidays_router)
 
 @app.get('/')
 async def read_root():

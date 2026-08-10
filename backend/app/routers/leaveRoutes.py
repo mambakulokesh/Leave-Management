@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import date
 from bson import ObjectId
+from datetime import date, timedelta
 
 from app.core.dependencies import require_admin, get_current_user
 from app.database.mongodb import (
     leave_types_collection,
     leave_balances_collection,
-    leave_requests_collection
+    leave_requests_collection,
+    holidays_collection
 )
 from app.schemas.leave import LeaveTypeCreate
 from app.schemas.leaveRequest import LeaveRequestCreate
@@ -89,9 +90,35 @@ async def create_leave_request(
     current_user=Depends(get_current_user)
 ):
 
-    requested_days = (
-        leave_data.to_date - leave_data.from_date
-    ).days + 1
+    # requested_days = (
+    #     leave_data.to_date - leave_data.from_date
+    # ).days + 1
+
+    requested_days = 0
+
+    current_date = leave_data.from_date
+    current_date_str = current_date.isoformat()
+
+    while current_date <= leave_data.to_date:
+        # Check for holiday - match either exact date string or datetime string that starts with the date
+        holiday = await holidays_collection.find_one({
+            "$or": [
+                {"holiday_date": current_date_str},
+                {"holiday_date": {"$regex": f"^{current_date_str}"}}
+            ]
+        })
+
+        if not holiday:
+            requested_days += 1
+
+        current_date += timedelta(days=1)
+        current_date_str = current_date.isoformat()
+
+    if requested_days == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected dates contain only holidays"
+        )
 
 
     balance = await leave_balances_collection.find_one({
@@ -163,11 +190,23 @@ async def get_my_leave_requests(
             to_date = date.fromisoformat(
                 request["to_date"]
             )
-
-            requested_days = (
-                to_date - from_date
-            ).days + 1
-
+            
+            # Calculate days excluding holidays
+            requested_days = 0
+            current_date = from_date
+            current_date_str = current_date.isoformat()
+            while current_date <= to_date:
+                # Check for holiday - match either exact date string or datetime string that starts with the date
+                holiday = await holidays_collection.find_one({
+                    "$or": [
+                        {"holiday_date": current_date_str},
+                        {"holiday_date": {"$regex": f"^{current_date_str}"}}
+                    ]
+                })
+                if not holiday:
+                    requested_days += 1
+                current_date += timedelta(days=1)
+                current_date_str = current_date.isoformat()
 
         result.append({
             "_id": str(request["_id"]),
@@ -215,7 +254,60 @@ async def get_manager_leave_requests(
 
     return result
 
+@router.get("/admin-manager/leave-requests")
+async def get_all_leave_requests(
+    current_user=Depends(get_current_user)
+):
+    if current_user["role"] not in ["manager", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only managers and admins can access all leave requests"
+        )
 
+    requests = await leave_requests_collection.find({}).to_list(length=None)
+
+    result = []
+
+    for request in requests:
+        requested_days = request.get("requested_days")
+        
+        if requested_days is None:
+            from_date = date.fromisoformat(request["from_date"])
+            to_date = date.fromisoformat(request["to_date"])
+            
+            requested_days = 0
+            current_date = from_date
+            current_date_str = current_date.isoformat()
+            while current_date <= to_date:
+                holiday = await holidays_collection.find_one({
+                    "$or": [
+                        {"holiday_date": current_date_str},
+                        {"holiday_date": {"$regex": f"^{current_date_str}"}}
+                    ]
+                })
+                if not holiday:
+                    requested_days += 1
+                current_date += timedelta(days=1)
+                current_date_str = current_date.isoformat()
+
+        leave_type = await leave_types_collection.find_one({
+            "_id": ObjectId(request["leave_type_id"])
+        })
+
+        result.append({
+            "_id": str(request["_id"]),
+            "user_id": request["user_id"],
+            "username": request["username"],
+            "leave_type_id": request["leave_type_id"],
+            "leave_type": leave_type["leave_type"] if leave_type else "Unknown",
+            "from_date": request["from_date"],
+            "to_date": request["to_date"],
+            "leave_reason": request["leave_reason"],
+            "requested_days": requested_days,
+            "status": request["status"]
+        })
+
+    return result
 
 @router.put("/manager/leave-requests/{request_id}/approve")
 async def approve_leave_request(
@@ -254,10 +346,22 @@ async def approve_leave_request(
             request["to_date"]
         )
 
-        requested_days = (
-            to_date - from_date
-        ).days + 1
-
+        # Calculate days excluding holidays
+        requested_days = 0
+        current_date = from_date
+        current_date_str = current_date.isoformat()
+        while current_date <= to_date:
+            # Check for holiday - match either exact date string or datetime string that starts with the date
+            holiday = await holidays_collection.find_one({
+                "$or": [
+                    {"holiday_date": current_date_str},
+                    {"holiday_date": {"$regex": f"^{current_date_str}"}}
+                ]
+            })
+            if not holiday:
+                requested_days += 1
+            current_date += timedelta(days=1)
+            current_date_str = current_date.isoformat()
 
     # Find employee leave balance
     balance = await leave_balances_collection.find_one({
@@ -271,14 +375,12 @@ async def approve_leave_request(
             detail="Leave balance not found"
         )
 
-
     # Check available balance
     if requested_days > balance["remaining_days"]:
         raise HTTPException(
             status_code=400,
             detail="Insufficient leave balance"
         )
-
 
     # Approve leave request
     await leave_requests_collection.update_one(
@@ -292,7 +394,6 @@ async def approve_leave_request(
         }
     )
 
-
     # Update leave balance
     await leave_balances_collection.update_one(
         {
@@ -305,7 +406,6 @@ async def approve_leave_request(
             }
         }
     )
-
 
     return {
         "message": "Leave request approved successfully"

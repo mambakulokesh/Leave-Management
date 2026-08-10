@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.security import hash_password
+from bson import ObjectId
 
 from app.core.dependencies import get_current_user, require_admin
 from app.database.mongodb import (
     users_collection,
     leave_types_collection,
-    leave_balances_collection
+    leave_balances_collection,
+    leave_requests_collection
 )
 from app.schemas.user import UserCreateByAdmin
 
@@ -90,4 +92,34 @@ async def create_user(
     return {
         "message": "User created successfully",
         "user_id": str(user_id)
+    }
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    current_user=Depends(require_admin)
+):
+    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+    
+    if str(user["_id"]) == str(current_user["_id"]):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete your own account"
+        )
+    
+    await users_collection.delete_one({"_id": ObjectId(user_id)})
+    
+    await leave_balances_collection.delete_many({"user_id": user_id})
+    
+    await leave_requests_collection.delete_many({"user_id": user_id})
+    
+    return {
+        "message": "User deleted successfully"
     }

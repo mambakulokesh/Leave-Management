@@ -21,19 +21,25 @@ The system provides role-based access for **Admin, Manager, and Employee**, with
 * Apply for leave
 * View submitted leave requests
 * Track leave request status
+* View holidays and holiday dates
+* Leave day count excludes holidays in the selected date range
 
 ### Manager
 
 * View pending leave requests
 * Approve leave requests
 * Reject leave requests
+* View all leave requests in a table with request details
 * Automatic leave balance update after approval
 
 ### Admin
 
 * View users
 * Create users
+* Delete users
 * Automatic leave balance creation for new users
+* View all leave requests in a table with request details
+* Manage holidays (create, edit, delete)
 * Create leave types
 * Edit leave types
 * Delete leave types
@@ -147,6 +153,8 @@ Total Days     = 12
 Used Days      = 3
 Remaining Days = 9
 ```
+
+Note: leave duration calculation excludes any holiday dates that fall inside the selected leave period.
 
 ## Authentication
 
