@@ -29,7 +29,7 @@ async def register(user: UserCreate):
 
     del user_dict["password"]
 
-    user_dict["role"] = "employee"
+    user_dict["role"] = "admin"
     user_dict["is_active"] = True
 
     await users_collection.insert_one(user_dict)
