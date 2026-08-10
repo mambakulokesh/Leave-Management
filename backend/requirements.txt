@@ -3,6 +3,8 @@ pymongo
 pyjwt
 uvicorn[standard]
 pydantic
+pwdlib
+pwdlib[argon2]
 pydantic-settings
 python-multipart
 email-validator
